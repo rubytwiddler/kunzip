@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9 -Ku
+#!/usr/bin/ruby -Ku
 # encoding: UTF-8
 #
 #    2010 by ruby.twiddler@gmail.com
@@ -11,8 +11,8 @@ require 'fileutils'
 APP_FILE = File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__
 APP_NAME = File.basename(APP_FILE).sub(/\.rb/, '')
 # APP_DIR = File::dirname(File.expand_path(File.dirname(APP_FILE)))
-APP_DIR = File::dirname(File.expand_path(APP_FILE))
-LIB_DIR = File::join(APP_DIR, "lib")
+APP_DIR = File.dirname(File.expand_path(APP_FILE))
+LIB_DIR = File.join(APP_DIR, "lib")
 APP_VERSION = "0.0.1"
 
 
@@ -22,6 +22,7 @@ require 'zip/zip'
 require 'shellwords'
 require 'time'
 require 'kconv'
+require 'fileutils'
 
 # additional libs
 require 'korundum4'
@@ -190,6 +191,7 @@ class MainWindow < KDE::MainWindow
         if dirName && !dirName.empty? then
             @zipFile.entries.each do |e|
                 fname = File.join(dirName, e.name.toutf8)
+                FileUtils.mkdir_p(File.dirname(fname))
                 e.extract(fname)
             end
         end
