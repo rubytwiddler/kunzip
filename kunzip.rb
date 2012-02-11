@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9 -Ku
+#!/usr/bin/ruby -Ku
 # encoding: UTF-8
 #
 #    2010 by ruby.twiddler@gmail.com
@@ -22,6 +22,7 @@ require 'zip/zip'
 require 'shellwords'
 require 'time'
 require 'kconv'
+require 'fileutils'
 
 # additional libs
 require 'korundum4'
@@ -32,6 +33,42 @@ require 'kio'
 #
 $:.unshift(LIB_DIR)
 require "mylibs"
+
+#--------------------------------------------------------------------
+class OverWriteDlg < KDE::Dialog
+    def initialize(parent)
+        super(parent)
+        setButtons( KDE::Dialog::Yes | KDE::Dialog::No | KDE::Dialog::User1 |
+                    KDE::Dialog::User2 | KDE::Dialog::Cancel )
+        @textEdit = Qt::Label.new do |w|
+            w.wordWrap= true
+        end
+        self.caption = "over write the file?"
+        setButtonText(KDE::Dialog::User2, "Yes to ALL")
+        setButtonText(KDE::Dialog::User1, "No to ALL")
+
+        setMainWidget(@textEdit)
+    end
+
+    attr_reader :textEdit
+    attr_reader :selectedButton
+
+    def self.ask(parent, fileName)
+        @@dialog ||= self.new(parent)
+        @@dialog.textEdit.text = "#{fileName} is already exist.\nover write this?"
+        @@dialog.exec
+    end
+
+    # virtual slot
+    def slotButtonClicked(btn)
+        @selectedButton = btn
+        accept
+    end
+
+    def self.selectedButton
+        @@dialog.selectedButton
+    end
+end
 
 #--------------------------------------------------------------------
 class FileItem
@@ -66,6 +103,10 @@ class FileTable < Qt::TableWidget
         super(0, 3)
 
         setHorizontalHeaderLabels( %w{ Name Date Size } )
+        self.horizontalHeader.stretchLastSection = true
+        self.selectionBehavior = Qt::AbstractItemView::SelectRows
+        self.alternatingRowColors = true
+
         readSettings
     end
 
@@ -118,7 +159,7 @@ class MainWindow < KDE::MainWindow
         createWidget
         createToolBar
         createMenu
-        @actions.readSettings
+        readSettings
         setAutoSaveSettings
     end
 
@@ -133,11 +174,14 @@ class MainWindow < KDE::MainWindow
         fileMenu.addSeparator
         fileMenu.addAction(quitAction)
 
-        # edit menu
+        # extract menu
         extractAllAction = @actions.addNew('Extract All', self, \
             { :icon => 'extract', :shortCut => 'Ctrl+X', :triggered => :extractAll })
-        editMenu = KDE::Menu.new(i18n('Edit'), self)
+        extractAllHereAutoAction = @actions.addNew('Extract All Here Auto', self, \
+            { :icon => 'extract', :shortCut => 'Ctrl+Shift+X', :triggered => :extractAllHereAuto })
+        editMenu = KDE::Menu.new(i18n('Extract'), self)
         editMenu.addAction(extractAllAction)
+        editMenu.addAction(extractAllHereAutoAction)
 
         # insert menus in MenuBar
         menu = KDE::MenuBar.new
@@ -161,13 +205,25 @@ class MainWindow < KDE::MainWindow
     # virtual slot
     # virtual slot
     def closeEvent(ev)
-        @actions.writeSettings
-        @fileTable.writeSettings
+        writeSettings
         super(ev)
         $config.sync    # important!  qtruby can't invoke destructor properly.
     end
 
 
+    GroupName = "MainWindow"
+    def readSettings
+        config = $config.group(GroupName)
+        @actions.readSettings
+    end
+
+    def writeSettings
+        config = $config.group(GroupName)
+        @actions.writeSettings
+        @fileTable.writeSettings
+    end
+        
+    
     #------------------------------------
     #
     #
@@ -187,13 +243,86 @@ class MainWindow < KDE::MainWindow
     slots :extractAll
     def extractAll
         dirName = KDE::FileDialog::getExistingDirectory()
-        if dirName && !dirName.empty? then
-            @zipFile.entries.each do |e|
-                fname = File.join(dirName, e.name.toutf8)
-                e.extract(fname)
+        extractToAll(dirName)
+    end
+    
+    slots :extractAllHereAuto
+    def extractAllHereAuto
+        dirName = Dir.pwd
+        unless unzipOnlyOneDirOrFile? then
+            # make directory name from file name.
+            rootDir = File.dirname(@zipFile.name)
+            basename = File.basename(@zipFile.name)
+            if File.extname(basename) != ".zip" then
+                basename += ".dir"
+            end
+            dirName = File.join(rootDir, basename)
+            while File.exist?(dirName) and File.file?(dirName) do
+                if dirName =~ /\.dir$/ then
+                    dirName += ".00"
+                else
+                    dirName.succ!
+                end
+            end
+        end
+        extractToAll(dirName)
+    end
+
+    def unzipOnlyOneDirOrFile?
+        return true if @zipFile.count == 1
+
+        topDir = nil
+        @zipFile.entries.each do |e|
+            name = e.name.toutf8
+            if e.file? then
+                dir = File.dirname(name).split(File::SEPARATOR)[0]
+                return false if topDir and topDir != dir
+                topDir = dir
+            end
+        end
+        true
+    end
+
+    def extractToAll(dirName)
+        return unless dirName && !dirName.empty?
+
+        skipAll = false
+        overWriteAll = false
+        @zipFile.entries.each do |e|
+            name = e.name.toutf8
+            fname = File.join(dirName, name)
+            if e.file? then
+                dir = File.dirname(fname)
+                FileUtils.mkdir_p(dir)
+                skip = false
+                if File.exist?(fname) then
+                    if skipAll then
+                        skip = true
+                    elsif overWriteAll then
+                        File.delete(fname)
+                    else
+                        OverWriteDlg.ask(self, fname)
+                        case OverWriteDlg.selectedButton
+                        when KDE::Dialog::Yes
+                            File.delete(fname)
+                        when KDE::Dialog::No
+                            skip = true
+                        when KDE::Dialog::User2 # yes to all
+                            overWriteAll = true
+                            File.delete(fname)
+                        when KDE::Dialog::User1 # No to all
+                            skip = true
+                            skipAll = true
+                        else # cancel
+                            return
+                        end
+                    end
+                end
+                e.extract(fname) unless skip
             end
         end
     end
+
 end
 #------------------------------------------------------------------------------
 #
