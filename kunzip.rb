@@ -13,7 +13,7 @@ APP_NAME = File.basename(APP_FILE).sub(/\.rb/, '')
 # APP_DIR = File::dirname(File.expand_path(File.dirname(APP_FILE)))
 APP_DIR = File.dirname(File.expand_path(APP_FILE))
 LIB_DIR = File.join(APP_DIR, "lib")
-APP_VERSION = "0.0.1"
+APP_VERSION = "0.0.2"
 
 
 # standard libs
@@ -70,15 +70,10 @@ class OverWriteDlg < KDE::Dialog
     end
 end
 
+
 #--------------------------------------------------------------------
 class FileItem
     attr_reader :name, :date, :size, :sjisname
-#     def initialize(frow)
-#         @size = frow[0]
-#         @date = Time.parse(frow[1] + ' ' + frow[2])
-#         @sjisname = frow[3]
-#         @name = @sjisname.toutf8
-#     end
     def initialize(entry)
         @name = entry.name.toutf8
         @size = entry.size
@@ -120,15 +115,6 @@ class FileTable < Qt::TableWidget
             setItem(r, 1, Item.new(f.date.to_s))
             setItem(r, 2, Item.new(f.size))
         end
-    end
-
-    def allfiles
-#         names = []
-#         rowCount.times do |i|
-#             names.push(item(i, 0).text)
-#         end
-#         names
-        @files.map do |f| f.sjisname end
     end
 
     GroupName = "FileTable"
@@ -230,13 +216,22 @@ class MainWindow < KDE::MainWindow
     def openFile
         # select zip file.
         fileName = KDE::FileDialog::getOpenFileName()
-        if fileName && !fileName.empty? && File.exist?(fileName) then
-            @zipFile = Zip::ZipFile.open(fileName)
-            fileItems = @zipFile.entries.map do |e|
-                FileItem.new(e)
-            end
-            @fileTable.setFiles(fileItems)
+        return if !fileName || fileName.empty?
+        unless File.exist?(fileName) then
+            KDE::MessageBox.error(self, "#{fileName} is not exist.")
+            return
         end
+        
+        begin
+            @zipFile = Zip::ZipFile.open(fileName)
+        rescue Zip::ZipError
+            KDE::MessageBox.error(self, "#{fileName} is not zip file.")
+            return
+        end
+        fileItems = @zipFile.entries.map do |e|
+            FileItem.new(e)
+        end
+        @fileTable.setFiles(fileItems)
     end
 
     slots :extractAll
@@ -247,7 +242,8 @@ class MainWindow < KDE::MainWindow
     
     slots :extractAllHereAuto
     def extractAllHereAuto
-        dirName = Dir.pwd
+        dirName = File.dirname(@zipFile.name)
+        dirName = Dir.pwd if dirName.empty?
         unless unzipOnlyOneDirOrFile? then
             # make directory name from file name.
             rootDir = File.dirname(@zipFile.name)
@@ -321,7 +317,6 @@ class MainWindow < KDE::MainWindow
             end
         end
     end
-
 end
 #------------------------------------------------------------------------------
 #
