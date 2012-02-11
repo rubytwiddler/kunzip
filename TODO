@@ -1,0 +1,12 @@
+get zip file from argv
+write error check.
+zip file check.
+add recent files menu.
+extract auto directory.
+extract only selected files.
+tool bar.
+remember last extacted directory.
+remember last opened file directory.
+gemnize.
+implement other compress file format that store sjis code.
+check sjis code
