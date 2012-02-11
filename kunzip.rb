@@ -11,8 +11,8 @@ require 'fileutils'
 APP_FILE = File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__
 APP_NAME = File.basename(APP_FILE).sub(/\.rb/, '')
 # APP_DIR = File::dirname(File.expand_path(File.dirname(APP_FILE)))
-APP_DIR = File::dirname(File.expand_path(APP_FILE))
-LIB_DIR = File::join(APP_DIR, "lib")
+APP_DIR = File.dirname(File.expand_path(APP_FILE))
+LIB_DIR = File.join(APP_DIR, "lib")
 APP_VERSION = "0.0.1"
 
 
@@ -202,7 +202,6 @@ class MainWindow < KDE::MainWindow
 
     #------------------------------------
     #
-    # virtual slot
     # virtual slot
     def closeEvent(ev)
         writeSettings
