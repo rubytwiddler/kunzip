@@ -207,8 +207,8 @@ class MainWindow < KDE::MainWindow
         @actions.writeSettings
         @fileTable.writeSettings
     end
-        
-    
+
+
     #------------------------------------
     #
     #
@@ -217,11 +217,14 @@ class MainWindow < KDE::MainWindow
         # select zip file.
         fileName = KDE::FileDialog::getOpenFileName()
         return if !fileName || fileName.empty?
+    end
+
+    def open(fileName)
         unless File.exist?(fileName) then
             KDE::MessageBox.error(self, "#{fileName} is not exist.")
             return
         end
-        
+
         begin
             @zipFile = Zip::ZipFile.open(fileName)
         rescue Zip::ZipError
@@ -239,7 +242,7 @@ class MainWindow < KDE::MainWindow
         dirName = KDE::FileDialog::getExistingDirectory()
         extractToAll(dirName)
     end
-    
+
     slots :extractAllHereAuto
     def extractAllHereAuto
         dirName = File.dirname(@zipFile.name)
@@ -248,12 +251,14 @@ class MainWindow < KDE::MainWindow
             # make directory name from file name.
             rootDir = File.dirname(@zipFile.name)
             basename = File.basename(@zipFile.name)
-            if File.extname(basename) != ".zip" then
+            if File.extname(basename) == ".zip" then
+                basename = basename[0..-5]
+            else
                 basename += ".dir"
             end
             dirName = File.join(rootDir, basename)
             while File.exist?(dirName) and File.file?(dirName) do
-                if dirName =~ /\.dir$/ then
+                if dirName !~ /\.\d+$/ then
                     dirName += ".00"
                 else
                     dirName.succ!
@@ -271,7 +276,7 @@ class MainWindow < KDE::MainWindow
             name = e.name.toutf8
             if e.file? then
                 dir = File.dirname(name).split(File::SEPARATOR)[0]
-                return false if topDir and topDir != dir
+                return false if dir == "." or (topDir and topDir != dir)
                 topDir = dir
             end
         end
@@ -280,7 +285,6 @@ class MainWindow < KDE::MainWindow
 
     def extractToAll(dirName)
         return unless dirName && !dirName.empty?
-
         skipAll = false
         overWriteAll = false
         @zipFile.entries.each do |e|
@@ -328,11 +332,18 @@ about = KDE::AboutData.new(APP_NAME, nil, KDE::ki18n(APP_NAME), APP_VERSION,
                            )
 about.addLicenseTextFile(APP_DIR + '/MIT-LICENSE')
 KDE::CmdLineArgs.init(ARGV, about)
+options = KDE::CmdLineOptions.new
+options.add("+[zip_file]", KDE::ki18n("zip file to open."))
+KDE::CmdLineArgs::addCmdLineOptions( options )
 
 $app = KDE::Application.new
 $config = KDE::Global::config
 win = MainWindow.new
 $app.setTopWidget(win)
-
+args = KDE::CmdLineArgs::parsedArgs
+# p args.count
+# p args.arg(0)
+# p args.getOption("zip_file")
+win.open(args.arg(0)) if args.count > 0
 win.show
 $app.exec
