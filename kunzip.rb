@@ -217,6 +217,7 @@ class MainWindow < KDE::MainWindow
         # select zip file.
         fileName = KDE::FileDialog::getOpenFileName()
         return if !fileName || fileName.empty?
+        open(fileName)
     end
 
     def open(fileName)
