@@ -215,7 +215,8 @@ class MainWindow < KDE::MainWindow
     slots :openFile
     def openFile
         # select zip file.
-        fileName = KDE::FileDialog::getOpenFileName()
+#         fileName = KDE::EncodingFileDialog::getOpenFileName(self)
+        fileName = Qt::FileDialog::getOpenFileName()
         return if !fileName || fileName.empty?
         open(fileName)
     end
@@ -240,7 +241,10 @@ class MainWindow < KDE::MainWindow
 
     slots :extractAll
     def extractAll
-        dirName = KDE::FileDialog::getExistingDirectory()
+#        dirName = KDE::EncodingFileDialog::getExistingDirectory()
+        dirName = Qt::FileDialog::getExistingDirectory()
+#         dirName = File.dirname(@zipFile.name)
+#         dirName = Dir.pwd if dirName.empty?
         extractToAll(dirName)
     end
 
